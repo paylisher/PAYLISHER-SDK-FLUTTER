@@ -1,0 +1,41 @@
+import 'package:flutter/foundation.dart';
+import 'paylisher_display_survey_text_content_type.dart';
+
+/// Appearance configuration for surveys
+@immutable
+class PaylisherDisplaySurveyAppearance {
+  const PaylisherDisplaySurveyAppearance({
+    this.fontFamily,
+    this.backgroundColor,
+    this.borderColor,
+    this.submitButtonColor,
+    this.submitButtonText,
+    this.submitButtonTextColor,
+    this.descriptionTextColor,
+    this.ratingButtonColor,
+    this.ratingButtonActiveColor,
+    this.placeholder,
+    this.displayThankYouMessage = true,
+    this.thankYouMessageHeader,
+    this.thankYouMessageDescription,
+    this.thankYouMessageDescriptionContentType,
+    this.thankYouMessageCloseButtonText,
+  });
+
+  final String? fontFamily;
+  final String? backgroundColor;
+  final String? borderColor;
+  final String? submitButtonColor;
+  final String? submitButtonText;
+  final String? submitButtonTextColor;
+  final String? descriptionTextColor;
+  final String? ratingButtonColor;
+  final String? ratingButtonActiveColor;
+  final String? placeholder;
+  final bool displayThankYouMessage;
+  final String? thankYouMessageHeader;
+  final String? thankYouMessageDescription;
+  final PaylisherDisplaySurveyTextContentType?
+      thankYouMessageDescriptionContentType;
+  final String? thankYouMessageCloseButtonText;
+}
