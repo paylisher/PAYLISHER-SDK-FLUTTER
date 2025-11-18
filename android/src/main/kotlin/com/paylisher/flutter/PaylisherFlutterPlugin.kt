@@ -5,12 +5,9 @@ import android.content.Context
 import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
-import com.paylisher.PersonProfiles
 import com.paylisher.Paylisher
-import com.paylisher.PaylisherConfig
+import com.paylisher.PersonProfiles
 import com.paylisher.android.PaylisherAndroid
 import com.paylisher.android.PaylisherAndroidConfig
 import com.paylisher.android.internal.getApplicationInfo
@@ -21,27 +18,20 @@ import io.flutter.plugin.common.MethodChannel.MethodCallHandler
 import io.flutter.plugin.common.MethodChannel.Result
 import java.util.Date
 
-/** PaylisherFlutterPlugin */
 class PaylisherFlutterPlugin :
     FlutterPlugin,
     MethodCallHandler {
-    // / The MethodChannel that will be the communication between Flutter and native Android
-    // /
-    // / This local reference serves to register the plugin with the Flutter Engine and unregister it
-    // / when the Flutter Engine is detached from the Activity
-    private lateinit var channel: MethodChannel
 
+    private lateinit var channel: MethodChannel
     private lateinit var applicationContext: Context
 
     private val snapshotSender = SnapshotSender()
 
-    // The surveys delegate
-    private var flutterSurveysDelegate: PaylisherFlutterSurveysDelegate? = null
+    override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        channel = MethodChannel(binding.binaryMessenger, "paylisher_flutter")
+        applicationContext = binding.applicationContext
+        Log.d("Paylisher", "[FlutterPlugin] onAttachedToEngine() çağırıldı")
 
-    override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
-        channel = MethodChannel(flutterPluginBinding.binaryMessenger, "paylisher_flutter")
-
-        this.applicationContext = flutterPluginBinding.applicationContext
         initPlugin()
 
         channel.setMethodCallHandler(this)
@@ -54,373 +44,230 @@ class PaylisherFlutterPlugin :
             val autoInit = bundle.getBoolean("com.paylisher.paylisher.AUTO_INIT", true)
 
             if (!autoInit) {
-                Log.i("Paylisher", "com.paylisher.paylisher.AUTO_INIT is disabled!")
+                Log.i("Paylisher", "[initPlugin] AUTO_INIT disabled")
                 return
             }
 
             val apiKey = bundle.getString("com.paylisher.paylisher.API_KEY")
-
             if (apiKey.isNullOrEmpty()) {
-                Log.e("Paylisher", "com.paylisher.paylisher.API_KEY is missing!")
+                Log.e("Paylisher", "[initPlugin] API_KEY missing")
                 return
             }
 
-            val host = bundle.getString("com.paylisher.paylisher.PAYLİSHER_HOST", PaylisherConfig.DEFAULT_HOST)
-            val captureApplicationLifecycleEvents = bundle.getBoolean("com.paylisher.paylisher.TRACK_APPLICATION_LIFECYCLE_EVENTS", false)
+            val host = bundle.getString("com.paylisher.paylisher.PAYLISHER_HOST")
+                ?: "https://datastudio.paylisher.com"
+
+            val captureLifecycle = bundle.getBoolean(
+                "com.paylisher.paylisher.TRACK_APPLICATION_LIFECYCLE_EVENTS",
+                false
+            )
             val debug = bundle.getBoolean("com.paylisher.paylisher.DEBUG", false)
 
-            val paylisherConfig = mutableMapOf<String, Any>()
-            paylisherConfig["apiKey"] = apiKey
-            paylisherConfig["host"] = host
-            paylisherConfig["captureApplicationLifecycleEvents"] = captureApplicationLifecycleEvents
-            paylisherConfig["debug"] = debug
+            val cfg = mutableMapOf<String, Any>()
+            cfg["apiKey"] = apiKey
+            cfg["host"] = host
+            cfg["captureApplicationLifecycleEvents"] = captureLifecycle
+            cfg["debug"] = debug
 
-            setupPaylisher(paylisherConfig)
+            Log.d("Paylisher", "[initPlugin] Auto setup başlatılıyor…")
+
+            setupPaylisher(cfg)
+
         } catch (e: Throwable) {
-            Log.e("Paylisher", "initPlugin error: $e")
+            Log.e("Paylisher", "[initPlugin] Hata: $e")
         }
     }
 
-    override fun onMethodCall(
-        call: MethodCall,
-        result: Result,
-    ) {
+    override fun onMethodCall(call: MethodCall, result: Result) {
+        Log.d("Paylisher", "[FlutterPlugin] Method call: ${call.method}")
+
         when (call.method) {
-            "setup" -> {
-                setup(call, result)
-            }
-            "identify" -> {
-                identify(call, result)
-            }
+            "setup" -> setup(call, result)
+            "identify" -> identify(call, result)
+            "capture" -> capture(call, result)
+            "screen" -> screen(call, result)
+            "alias" -> alias(call, result)
+            "distinctId" -> distinctId(result)
+            "reset" -> reset(result)
+            "disable" -> disable(result)
+            "enable" -> enable(result)
+            "isOptOut" -> isOptOut(result)
+            "isFeatureEnabled" -> isFeatureEnabled(call, result)
+            "reloadFeatureFlags" -> reloadFeatureFlags(result)
+            "group" -> group(call, result)
+            "getFeatureFlag" -> getFeatureFlag(call, result)
+            "getFeatureFlagPayload" -> getFeatureFlagPayload(call, result)
+            "register" -> register(call, result)
+            "unregister" -> unregister(call, result)
+            "debug" -> debug(call, result)
+            "flush" -> flush(result)
+            "captureException" -> captureException(call, result)
+            "close" -> close(result)
+            "sendMetaEvent" -> handleMetaEvent(call, result)
+            "sendFullSnapshot" -> handleSendFullSnapshot(call, result)
+            "isSessionReplayActive" -> result.success(Paylisher.isSessionReplayActive())
+            "getSessionId" -> getSessionId(result)
+            "openUrl" -> openUrl(call, result)
 
-            "capture" -> {
-                capture(call, result)
-            }
-
-            "screen" -> {
-                screen(call, result)
-            }
-
-            "alias" -> {
-                alias(call, result)
-            }
-
-            "distinctId" -> {
-                distinctId(result)
-            }
-
-            "reset" -> {
-                reset(result)
-            }
-
-            "disable" -> {
-                disable(result)
-            }
-
-            "enable" -> {
-                enable(result)
-            }
-
-            "isOptOut" -> {
-                isOptOut(result)
-            }
-
-            "isFeatureEnabled" -> {
-                isFeatureEnabled(call, result)
-            }
-
-            "reloadFeatureFlags" -> {
-                reloadFeatureFlags(result)
-            }
-
-            "group" -> {
-                group(call, result)
-            }
-
-            "getFeatureFlag" -> {
-                getFeatureFlag(call, result)
-            }
-
-            "getFeatureFlagPayload" -> {
-                getFeatureFlagPayload(call, result)
-            }
-
-            "register" -> {
-                register(call, result)
-            }
-            "unregister" -> {
-                unregister(call, result)
-            }
-            "debug" -> {
-                debug(call, result)
-            }
-            "flush" -> {
-                flush(result)
-            }
-            "captureException" -> {
-                captureException(call, result)
-            }
-            "close" -> {
-                close(result)
-            }
-            "sendMetaEvent" -> {
-                handleMetaEvent(call, result)
-            }
-            "sendFullSnapshot" -> {
-                handleSendFullSnapshot(call, result)
-            }
-            "isSessionReplayActive" -> {
-                result.success(isSessionReplayActive())
-            }
-            "getSessionId" -> {
-                getSessionId(result)
-            }
-            "openUrl" -> {
-                openUrl(call, result)
-            }
             "surveyAction" -> {
-                handleSurveyAction(call, result)
+                Log.w("Paylisher", "[Survey] Android SDK survey desteklemiyor → yok sayılıyor")
+                result.success(null)
             }
-            else -> {
-                result.notImplemented()
-            }
+
+            else -> result.notImplemented()
         }
     }
 
-    private fun isSessionReplayActive(): Boolean = Paylisher.isSessionReplayActive()
+    private fun setup(call: MethodCall, result: Result) {
+        try {
+            val args = call.arguments as? Map<String, Any> ?: emptyMap()
+            if (args.isEmpty()) {
+                result.error("PaylisherFlutterException", "Arguments null", null)
+                return
+            }
 
-    private fun handleMetaEvent(
-        call: MethodCall,
-        result: Result,
-    ) {
+            Log.d("Paylisher", "[setup] Flutter'dan config alındı → $args")
+
+            setupPaylisher(args)
+            result.success(null)
+
+        } catch (e: Throwable) {
+            result.error("PaylisherFlutterException", e.message, null)
+        }
+    }
+
+    private fun setupPaylisher(cfg: Map<String, Any>) {
+        val apiKey = cfg["apiKey"] as? String
+        if (apiKey.isNullOrEmpty()) {
+            Log.e("Paylisher", "[setupPaylisher] API Key missing!")
+            return
+        }
+
+        val host = cfg["host"] as? String ?: "https://datastudio.paylisher.com"
+        val config = PaylisherAndroidConfig(apiKey, host).apply {
+
+            cfg.getIfNotNull<Boolean>("captureApplicationLifecycleEvents") {
+                captureApplicationLifecycleEvents = it
+            }
+            cfg.getIfNotNull<Boolean>("debug") {
+                debug = it
+            }
+
+            // Session Replay
+            cfg.getIfNotNull<Boolean>("sessionReplay") {
+                sessionReplay = it
+            }
+            this.sessionReplayConfig.captureLogcat = false
+
+            // Person profiles
+            cfg.getIfNotNull<String>("personProfiles") {
+                personProfiles = when (it) {
+                    "never" -> PersonProfiles.NEVER
+                    "always" -> PersonProfiles.ALWAYS
+                    "identifiedOnly" -> PersonProfiles.IDENTIFIED_ONLY
+                    else -> PersonProfiles.IDENTIFIED_ONLY
+                }
+            }
+
+            // Surveys — Android desteklemez
+            cfg.getIfNotNull<Boolean>("surveys") { enabled ->
+                Log.w("Paylisher", "[setupPaylisher] Surveys = $enabled ancak Android SDK desteklemiyor.")
+            }
+
+            sdkName = "paylisher-flutter"
+            sdkVersion = cfg["sdkVersion"] as? String ?: "1.0.0"
+        }
+
+        Log.d("Paylisher", "[setupPaylisher] PaylisherAndroid.setup() çağırılıyor")
+        PaylisherAndroid.setup(applicationContext, config)
+    }
+
+    private fun handleMetaEvent(call: MethodCall, result: Result) {
         try {
             val width = call.argument<Int>("width") ?: 0
             val height = call.argument<Int>("height") ?: 0
             val screen = call.argument<String>("screen") ?: ""
 
-            if (width == 0 || height == 0) {
-                result.error("INVALID_ARGUMENT", "Width or height is 0", null)
-                return
-            }
-
             snapshotSender.sendMetaEvent(width, height, screen)
             result.success(null)
+
         } catch (e: Throwable) {
-            result.error("PaylisherFlutterException", e.localizedMessage, null)
+            result.error("PaylisherFlutterException", e.message, null)
         }
     }
 
-    private fun setup(
-        call: MethodCall,
-        result: Result,
-    ) {
+    private fun handleSendFullSnapshot(call: MethodCall, result: Result) {
         try {
-            val args = call.arguments() as Map<String, Any>? ?: mapOf<String, Any>()
-            if (args.isEmpty()) {
-                result.error("PaylisherFlutterException", "Arguments is null or empty", null)
-                return
-            }
-
-            setupPaylisher(args)
-
-            result.success(null)
-        } catch (e: Throwable) {
-            result.error("PaylisherFlutterException", e.localizedMessage, null)
-        }
-    }
-
-    private fun setupPaylisher(paylisherConfig: Map<String, Any>) {
-        val apiKey = paylisherConfig["apiKey"] as String?
-        if (apiKey.isNullOrEmpty()) {
-            Log.e("Paylisher", "apiKey is missing!")
-            return
-        }
-
-        val host = paylisherConfig["host"] as String? ?: PaylisherConfig.DEFAULT_HOST
-
-        val config =
-            PaylisherAndroidConfig(apiKey, host).apply {
-                captureScreenViews = false
-                captureDeepLinks = false
-                paylisherConfig.getIfNotNull<Boolean>("captureApplicationLifecycleEvents") {
-                    captureApplicationLifecycleEvents = it
-                }
-                paylisherConfig.getIfNotNull<Boolean>("debug") {
-                    debug = it
-                }
-                paylisherConfig.getIfNotNull<Int>("flushAt") {
-                    flushAt = it
-                }
-                paylisherConfig.getIfNotNull<Int>("maxQueueSize") {
-                    maxQueueSize = it
-                }
-                paylisherConfig.getIfNotNull<Int>("maxBatchSize") {
-                    maxBatchSize = it
-                }
-                paylisherConfig.getIfNotNull<Int>("flushInterval") {
-                    flushIntervalSeconds = it
-                }
-                paylisherConfig.getIfNotNull<Boolean>("sendFeatureFlagEvents") {
-                    sendFeatureFlagEvent = it
-                }
-                paylisherConfig.getIfNotNull<Boolean>("preloadFeatureFlags") {
-                    preloadFeatureFlags = it
-                }
-                paylisherConfig.getIfNotNull<Boolean>("optOut") {
-                    optOut = it
-                }
-                paylisherConfig.getIfNotNull<String>("personProfiles") {
-                    when (it) {
-                        "never" -> personProfiles = PersonProfiles.NEVER
-                        "always" -> personProfiles = PersonProfiles.ALWAYS
-                        "identifiedOnly" -> personProfiles = PersonProfiles.IDENTIFIED_ONLY
-                    }
-                }
-                paylisherConfig.getIfNotNull<Boolean>("sessionReplay") {
-                    sessionReplay = it
-                }
-
-                this.sessionReplayConfig.captureLogcat = false
-
-                // Configure surveys
-                paylisherConfig.getIfNotNull<Boolean>("surveys") {
-                    surveys = it
-                    if (surveys) {
-                        // If surveys are enabled, create and assign the surveys delegate
-                        val delegate = PaylisherFlutterSurveysDelegate(channel)
-                        surveysConfig.surveysDelegate = delegate
-                        flutterSurveysDelegate = delegate
-                    }
-                }
-
-                // Configure error tracking autocapture
-                paylisherConfig.getIfNotNull<Map<String, Any>>("errorTrackingConfig") { errorConfig ->
-                    errorConfig.getIfNotNull<Boolean>("captureNativeExceptions") {
-                        errorTrackingConfig.autoCapture = it
-                    }
-                    errorConfig.getIfNotNull<List<String>>("inAppIncludes") { includes ->
-                        errorTrackingConfig.inAppIncludes.addAll(includes)
-                    }
-                }
-
-                sdkName = "paylisher-flutter"
-                sdkVersion = paylisherVersion
-            }
-        PaylisherAndroid.setup(applicationContext, config)
-    }
-
-    override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
-        channel.setMethodCallHandler(null)
-    }
-
-    private fun handleSendFullSnapshot(
-        call: MethodCall,
-        result: Result,
-    ) {
-        try {
-            val imageBytes = call.argument<ByteArray>("imageBytes")
+            val bytes = call.argument<ByteArray>("imageBytes")
             val id = call.argument<Int>("id") ?: 1
             val x = call.argument<Int>("x") ?: 0
             val y = call.argument<Int>("y") ?: 0
-            if (imageBytes != null) {
-                snapshotSender.sendFullSnapshot(imageBytes, id, x, y)
-                result.success(null)
-            } else {
-                result.error("INVALID_ARGUMENT", "Image bytes are null", null)
+
+            if (bytes != null) {
+                snapshotSender.sendFullSnapshot(bytes, id, x, y)
             }
-        } catch (e: Throwable) {
-            result.error("PaylisherFlutterException", e.localizedMessage, null)
-        }
-    }
 
-    private fun getFeatureFlag(
-        call: MethodCall,
-        result: Result,
-    ) {
-        try {
-            val featureFlagKey: String = call.argument("key")!!
-            val flag = Paylisher.getFeatureFlag(featureFlagKey)
-            result.success(flag)
-        } catch (e: Throwable) {
-            result.error("PaylisherFlutterException", e.localizedMessage, null)
-        }
-    }
-
-    private fun getFeatureFlagPayload(
-        call: MethodCall,
-        result: Result,
-    ) {
-        try {
-            val featureFlagKey: String = call.argument("key")!!
-            val flag = Paylisher.getFeatureFlagPayload(featureFlagKey)
-            result.success(flag)
-        } catch (e: Throwable) {
-            result.error("PaylisherFlutterException", e.localizedMessage, null)
-        }
-    }
-
-    private fun identify(
-        call: MethodCall,
-        result: Result,
-    ) {
-        try {
-            val userId: String = call.argument("userId")!!
-            val userProperties: Map<String, Any>? = call.argument("userProperties")
-            val userPropertiesSetOnce: Map<String, Any>? = call.argument("userPropertiesSetOnce")
-            Paylisher.identify(userId, userProperties, userPropertiesSetOnce)
             result.success(null)
+
         } catch (e: Throwable) {
-            result.error("PaylisherFlutterException", e.localizedMessage, null)
+            result.error("PaylisherFlutterException", e.message, null)
         }
     }
 
-    private fun capture(
-        call: MethodCall,
-        result: Result,
-    ) {
+    private fun identify(call: MethodCall, result: Result) {
         try {
-            val eventName: String = call.argument("eventName")!!
-            val properties: Map<String, Any>? = call.argument("properties")
-            Paylisher.capture(eventName, properties = properties)
+            val userId = call.argument<String>("userId")!!
+            val props = call.argument<Map<String, Any>>("userProperties")
+            val once = call.argument<Map<String, Any>>("userPropertiesSetOnce")
+
+            Paylisher.identify(userId, props, once)
             result.success(null)
+
         } catch (e: Throwable) {
-            result.error("PaylisherFlutterException", e.localizedMessage, null)
+            result.error("PaylisherFlutterException", e.message, null)
         }
     }
 
-    private fun screen(
-        call: MethodCall,
-        result: Result,
-    ) {
+    private fun capture(call: MethodCall, result: Result) {
         try {
-            val screenName: String = call.argument("screenName")!!
-            val properties: Map<String, Any>? = call.argument("properties")
-            Paylisher.screen(screenName, properties)
+            val event = call.argument<String>("eventName")!!
+            val props = call.argument<Map<String, Any>>("properties")
+            Paylisher.capture(event, properties = props)
             result.success(null)
+
         } catch (e: Throwable) {
-            result.error("PaylisherFlutterException", e.localizedMessage, null)
+            result.error("PaylisherFlutterException", e.message, null)
         }
     }
 
-    private fun alias(
-        call: MethodCall,
-        result: Result,
-    ) {
+    private fun screen(call: MethodCall, result: Result) {
         try {
-            val alias: String = call.argument("alias")!!
-            Paylisher.alias(alias)
+            val name = call.argument<String>("screenName")!!
+            val props = call.argument<Map<String, Any>>("properties")
+            Paylisher.screen(name, props)
             result.success(null)
+
         } catch (e: Throwable) {
-            result.error("PaylisherFlutterException", e.localizedMessage, null)
+            result.error("PaylisherFlutterException", e.message, null)
+        }
+    }
+
+    private fun alias(call: MethodCall, result: Result) {
+        try {
+            val a = call.argument<String>("alias")!!
+            Paylisher.alias(a)
+            result.success(null)
+
+        } catch (e: Throwable) {
+            result.error("PaylisherFlutterException", e.message, null)
         }
     }
 
     private fun distinctId(result: Result) {
         try {
-            val distinctId: String = Paylisher.distinctId()
-            result.success(distinctId)
+            result.success(Paylisher.distinctId())
         } catch (e: Throwable) {
-            result.error("PaylisherFlutterException", e.localizedMessage, null)
+            result.error("PaylisherFlutterException", e.message, null)
         }
     }
 
@@ -429,7 +276,7 @@ class PaylisherFlutterPlugin :
             Paylisher.reset()
             result.success(null)
         } catch (e: Throwable) {
-            result.error("PaylisherFlutterException", e.localizedMessage, null)
+            result.error("PaylisherFlutterException", e.message, null)
         }
     }
 
@@ -438,20 +285,7 @@ class PaylisherFlutterPlugin :
             Paylisher.optIn()
             result.success(null)
         } catch (e: Throwable) {
-            result.error("PaylisherFlutterException", e.localizedMessage, null)
-        }
-    }
-
-    private fun debug(
-        call: MethodCall,
-        result: Result,
-    ) {
-        try {
-            val debug: Boolean = call.argument("debug")!!
-            Paylisher.debug(debug)
-            result.success(null)
-        } catch (e: Throwable) {
-            result.error("PaylisherFlutterException", e.localizedMessage, null)
+            result.error("PaylisherFlutterException", e.message, null)
         }
     }
 
@@ -460,29 +294,24 @@ class PaylisherFlutterPlugin :
             Paylisher.optOut()
             result.success(null)
         } catch (e: Throwable) {
-            result.error("PaylisherFlutterException", e.localizedMessage, null)
+            result.error("PaylisherFlutterException", e.message, null)
         }
     }
 
     private fun isOptOut(result: Result) {
         try {
-            val isOptedOut = Paylisher.isOptOut()
-            result.success(isOptedOut)
+            result.success(Paylisher.isOptOut())
         } catch (e: Throwable) {
-            result.error("PaylisherFlutterException", e.localizedMessage, null)
+            result.error("PaylisherFlutterException", e.message, null)
         }
     }
 
-    private fun isFeatureEnabled(
-        call: MethodCall,
-        result: Result,
-    ) {
+    private fun isFeatureEnabled(call: MethodCall, result: Result) {
         try {
-            val key: String = call.argument("key")!!
-            val isEnabled = Paylisher.isFeatureEnabled(key)
-            result.success(isEnabled)
+            val key = call.argument<String>("key")!!
+            result.success(Paylisher.isFeatureEnabled(key))
         } catch (e: Throwable) {
-            result.error("PaylisherFlutterException", e.localizedMessage, null)
+            result.error("PaylisherFlutterException", e.message, null)
         }
     }
 
@@ -491,49 +320,72 @@ class PaylisherFlutterPlugin :
             Paylisher.reloadFeatureFlags()
             result.success(null)
         } catch (e: Throwable) {
-            result.error("PaylisherFlutterException", e.localizedMessage, null)
+            result.error("PaylisherFlutterException", e.message, null)
         }
     }
 
-    private fun group(
-        call: MethodCall,
-        result: Result,
-    ) {
+    private fun group(call: MethodCall, result: Result) {
         try {
-            val groupType: String = call.argument("groupType")!!
-            val groupKey: String = call.argument("groupKey")!!
-            val groupProperties: Map<String, Any>? = call.argument("groupProperties")
-            Paylisher.group(groupType, groupKey, groupProperties)
+            val type = call.argument<String>("groupType")!!
+            val key = call.argument<String>("groupKey")!!
+            val props = call.argument<Map<String, Any>>("groupProperties")
+
+            Paylisher.group(type, key, props)
             result.success(null)
+
         } catch (e: Throwable) {
-            result.error("PaylisherFlutterException", e.localizedMessage, null)
+            result.error("PaylisherFlutterException", e.message, null)
         }
     }
 
-    private fun register(
-        call: MethodCall,
-        result: Result,
-    ) {
+    private fun getFeatureFlag(call: MethodCall, result: Result) {
         try {
-            val key: String = call.argument("key")!!
-            val value: Any = call.argument("value")!!
+            val key = call.argument<String>("key")!!
+            result.success(Paylisher.getFeatureFlag(key))
+        } catch (e: Throwable) {
+            result.error("PaylisherFlutterException", e.message, null)
+        }
+    }
+
+    private fun getFeatureFlagPayload(call: MethodCall, result: Result) {
+        try {
+            val key = call.argument<String>("key")!!
+            result.success(Paylisher.getFeatureFlagPayload(key))
+        } catch (e: Throwable) {
+            result.error("PaylisherFlutterException", e.message, null)
+        }
+    }
+
+    private fun register(call: MethodCall, result: Result) {
+        try {
+            val key = call.argument<String>("key")!!
+            val value = call.argument<Any>("value")!!
             Paylisher.register(key, value)
             result.success(null)
+
         } catch (e: Throwable) {
-            result.error("PaylisherFlutterException", e.localizedMessage, null)
+            result.error("PaylisherFlutterException", e.message, null)
         }
     }
 
-    private fun unregister(
-        call: MethodCall,
-        result: Result,
-    ) {
+    private fun unregister(call: MethodCall, result: Result) {
         try {
-            val key: String = call.argument("key")!!
+            val key = call.argument<String>("key")!!
             Paylisher.unregister(key)
             result.success(null)
+
         } catch (e: Throwable) {
-            result.error("PaylisherFlutterException", e.localizedMessage, null)
+            result.error("PaylisherFlutterException", e.message, null)
+        }
+    }
+
+    private fun debug(call: MethodCall, result: Result) {
+        try {
+            val enabled = call.argument<Boolean>("debug") ?: false
+            Paylisher.debug(enabled)
+            result.success(null)
+        } catch (e: Throwable) {
+            result.error("PaylisherFlutterException", e.message, null)
         }
     }
 
@@ -542,35 +394,20 @@ class PaylisherFlutterPlugin :
             Paylisher.flush()
             result.success(null)
         } catch (e: Throwable) {
-            result.error("PaylisherFlutterException", e.localizedMessage, null)
+            result.error("PaylisherFlutterException", e.message, null)
         }
     }
 
-    private fun captureException(
-        call: MethodCall,
-        result: Result,
-    ) {
+    private fun captureException(call: MethodCall, result: Result) {
         try {
-            val arguments =
-                call.arguments as? Map<String, Any> ?: run {
-                    result.error("INVALID_ARGUMENTS", "Invalid arguments for captureException", null)
-                    return
-                }
+            val args = call.arguments as? Map<String, Any> ?: emptyMap()
+            val props = args["properties"] as? Map<String, Any>
 
-            val properties = arguments["properties"] as? Map<String, Any>
-            val timestampMs = arguments["timestamp"] as? Long
-
-            // Extract timestamp from Flutter
-            val timestamp: Date? =
-                timestampMs?.let {
-                    // timestampMs already in UTC milliseconds epoch
-                    Date(timestampMs)
-                }
-
-            Paylisher.capture("\$exception", properties = properties, timestamp = timestamp)
+            Paylisher.capture("\$exception", properties = props)
             result.success(null)
+
         } catch (e: Throwable) {
-            result.error("CAPTURE_EXCEPTION_ERROR", "Failed to capture exception: ${e.message}", null)
+            result.error("CAPTURE_EXCEPTION_ERROR", e.message, null)
         }
     }
 
@@ -579,104 +416,54 @@ class PaylisherFlutterPlugin :
             Paylisher.close()
             result.success(null)
         } catch (e: Throwable) {
-            result.error("PaylisherFlutterException", e.localizedMessage, null)
+            result.error("PaylisherFlutterException", e.message, null)
         }
     }
 
     private fun getSessionId(result: Result) {
         try {
-            val sessionId = Paylisher.getSessionId()
-            result.success(sessionId?.toString())
+            val id = Paylisher.getSessionId()
+            result.success(id?.toString())
         } catch (e: Throwable) {
-            result.error("PaylisherFlutterException", e.localizedMessage, null)
+            result.error("PaylisherFlutterException", e.message, null)
         }
     }
 
-    // Call the `completion` closure if cast to map value with `key` and type `T` is successful.
-    @Suppress("UNCHECKED_CAST")
-    private fun <T> Map<String, Any>.getIfNotNull(
-        key: String,
-        callback: (T) -> Unit,
-    ) {
-        (get(key) as? T)?.let {
-            callback(it)
-        }
-    }
-
-    private fun openUrl(
-        call: MethodCall,
-        result: Result,
-    ) {
+    private fun openUrl(call: MethodCall, result: Result) {
         try {
-            val raw = (call.arguments as? String)?.trim()
-            if (raw.isNullOrEmpty()) {
-                result.error("InvalidArguments", "URL is null or empty", null)
+            val raw = call.arguments as? String ?: ""
+            if (raw.isBlank()) {
+                result.error("InvalidArguments", "URL is empty", null)
                 return
             }
 
-            var uri =
-                try {
-                    Uri.parse(raw)
-                } catch (e: Throwable) {
-                    result.error("InvalidArguments", "Malformed URL: $raw", null)
-                    return
-                }
+            val uri = Uri.parse(
+                if (raw.startsWith("http")) raw else "https://$raw"
+            )
 
-            // If no scheme provided (e.g., "example.com"), default to https://
-            if (uri.scheme.isNullOrEmpty()) {
-                uri = Uri.parse("https://$raw")
+            val intent = Intent(Intent.ACTION_VIEW, uri).apply {
+                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                addCategory(Intent.CATEGORY_BROWSABLE)
             }
 
-            val intent =
-                Intent(Intent.ACTION_VIEW, uri).apply {
-                    addCategory(Intent.CATEGORY_BROWSABLE)
-                    addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                }
+            applicationContext.startActivity(intent)
+            result.success(null)
 
-            try {
-                applicationContext.startActivity(intent)
-                result.success(null)
-            } catch (e: ActivityNotFoundException) {
-                result.error("ActivityNotFound", "No application can handle ACTION_VIEW for the given URL", null)
-            }
-        } catch (e: Throwable) {
-            result.error("PaylisherFlutterException", e.localizedMessage, null)
+        } catch (e: ActivityNotFoundException) {
+            result.error("ActivityNotFound", e.message, null)
         }
     }
 
-    private fun invokeFlutterMethod(
-        method: String,
-        arguments: Any? = null,
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> Map<String, Any>.getIfNotNull(
+        key: String,
+        block: (T) -> Unit,
     ) {
-        if (Looper.myLooper() == Looper.getMainLooper()) {
-            channel.invokeMethod(method, arguments)
-        } else {
-            Handler(Looper.getMainLooper()).post {
-                channel.invokeMethod(method, arguments)
-            }
-        }
+        (this[key] as? T)?.let(block)
     }
 
-    // MARK: - Survey Action Handling
-
-    private fun handleSurveyAction(
-        call: MethodCall,
-        result: Result,
-    ) {
-        val args = call.arguments as? Map<String, Any>
-        val type = args?.get("type") as? String
-
-        // Check for invalid arguments
-        if (args == null || type == null) {
-            result.error("InvalidArguments", "Invalid survey action arguments", null)
-            return
-        }
-
-        if (flutterSurveysDelegate == null) {
-            result.error("InvalidArguments", "Survey delegate not available", null)
-            return
-        }
-
-        flutterSurveysDelegate?.handleSurveyAction(type, args, result)
+    override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
+        Log.d("Paylisher", "[FlutterPlugin] Detached")
+        channel.setMethodCallHandler(null)
     }
 }
