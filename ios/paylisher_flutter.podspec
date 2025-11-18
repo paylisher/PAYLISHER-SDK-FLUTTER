@@ -22,7 +22,7 @@ Paylisher flutter plugin
   s.osx.dependency 'FlutterMacOS'
 
   # ~> Version 3.32.0 up to, but not including, 4.0.0
-  s.dependency 'Paylisher', '>= 3.32.0', '< 4.0.0' //
+  s.dependency 'Paylisher', '>= 3.32.0', '< 4.0.0' # Burda Paylisher adında bir cocoapods pakedi arıyor ve varsa indiriyor. Bu paket aslında ios sdk'ini içeren paket.
 
   s.ios.deployment_target = '13.0'
   # Paylisher iOS SDK 3.0.0 requires >= 10.15

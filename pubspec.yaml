@@ -47,8 +47,6 @@ flutter:
         pluginClass: PaylisherFlutterPlugin
       ios:
         pluginClass: PaylisherFlutterPlugin
-      macos:
-        pluginClass: PaylisherFlutterPlugin
       web:
         pluginClass: PaylisherFlutterWeb
         fileName: paylisher_flutter_web.dart

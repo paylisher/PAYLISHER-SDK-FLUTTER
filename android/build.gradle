@@ -30,6 +30,7 @@ android {
     }
 
     compileSdkVersion flutter.compileSdkVersion
+    ndkVersion "27.0.12077973"
 
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
@@ -48,14 +49,13 @@ android {
     }
 
     defaultConfig {
-        minSdkVersion 21
+        minSdkVersion 24
     }
 
     dependencies {
         testImplementation 'org.jetbrains.kotlin:kotlin-test'
         testImplementation 'org.mockito:mockito-core:5.0.0'
-        // + Version 3.25.0 and the versions up to 4.0.0, not including 4.0.0 and higher
-        implementation 'com.paylisher:paylisher-android:[3.25.0,4.0.0]' //maven içinde bulunan android sdk'ini içeren paket.
+        implementation 'com.paylisher:paylisher-sdk-android:1.0.0'
     }
 
     testOptions {
