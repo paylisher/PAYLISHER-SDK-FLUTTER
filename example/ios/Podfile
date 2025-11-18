@@ -31,6 +31,10 @@ target 'Runner' do
   use_frameworks!
   use_modular_headers!
 
+
+  # 👇 KENDİ Paylisher iOS SDK'n buradan gelsin
+  pod 'Paylisher', :path => '../../../paylisher-ios'
+
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
   target 'RunnerTests' do
     inherit! :search_paths
