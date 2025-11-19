@@ -2,12 +2,10 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<key>CADisableMinimumFrameDurationOnPhone</key>
-	<true/>
 	<key>CFBundleDevelopmentRegion</key>
 	<string>$(DEVELOPMENT_LANGUAGE)</string>
 	<key>CFBundleDisplayName</key>
-	<string>Paylisher Flutter</string>
+	<string>Paylisher Flutter Example</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -26,8 +24,6 @@
 	<string>$(FLUTTER_BUILD_NUMBER)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<key>UIApplicationSupportsIndirectInputEvents</key>
-	<true/>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
@@ -45,15 +41,9 @@
 		<string>UIInterfaceOrientationLandscapeLeft</string>
 		<string>UIInterfaceOrientationLandscapeRight</string>
 	</array>
-	<key>com.paylisher.paylisher.API_KEY</key>
-	<string>phc_4X0rTcSz4dQ6NmXXFWrlMdoDdxge382aPVj0ozvSKCd</string>
-	<key>com.paylisher.paylisher.AUTO_INIT</key>
-	<false/>
-	<key>com.paylisher.paylisher.CAPTURE_APPLICATION_LIFECYCLE_EVENTS</key>
+	<key>CADisableMinimumFrameDurationOnPhone</key>
 	<true/>
-	<key>com.paylisher.paylisher.DEBUG</key>
+	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
-	<key>com.paylisher.paylisher.PAYLİSHER_HOST</key>
-	<string>https://ds.paylisher.com</string>
 </dict>
 </plist>

@@ -41,7 +41,7 @@ public class PaylisherFlutterPlugin: NSObject, FlutterPlugin {
 
         let apiKey = Bundle.main.object(forInfoDictionaryKey: "com.paylisher.paylisher.API_KEY") as? String ?? ""
 
-        let host = Bundle.main.object(forInfoDictionaryKey: "com.paylisher.paylisher.PAYLİSHER_HOST") as? String ?? PaylisherConfig.defaultHost
+        let host = Bundle.main.object(forInfoDictionaryKey: "com.paylisher.paylisher.PAYLISHER_HOST") as? String ?? PaylisherConfig.defaultHost
         let captureApplicationLifecycleEvents = Bundle.main.object(forInfoDictionaryKey: "com.paylisher.paylisher.CAPTURE_APPLICATION_LIFECYCLE_EVENTS") as? Bool ?? false
         let debug = Bundle.main.object(forInfoDictionaryKey: "com.paylisher.paylisher.DEBUG") as? Bool ?? false
 
@@ -131,16 +131,6 @@ public class PaylisherFlutterPlugin: NSObject, FlutterPlugin {
             }
             // disabled since Dart has native libs such as http/dio and dont use the ios URLSession
             config.sessionReplayConfig.captureNetworkTelemetry = false
-
-            // configure surveys
-            if #available(iOS 15.0, *) {
-                let surveys: Bool = paylisherConfig["surveys"] as? Bool ?? false
-                config.surveys = surveys
-                if surveys {
-                    // if surveys are enabled, assign this instance as the survey delegate (we'll take over rendering)
-                    config.surveysConfig.surveysDelegate = instance
-                }
-            }
         #endif
 
         // Update SDK name and version
@@ -149,11 +139,6 @@ public class PaylisherFlutterPlugin: NSObject, FlutterPlugin {
 
         PaylisherSDK.shared.setup(config)
     }
-
-    private var currentSurvey: PaylisherDisplaySurvey?
-    private var onSurveyShownCallback: OnPaylisherSurveyShown?
-    private var onSurveyResponseCallback: OnPaylisherSurveyResponse?
-    private var onSurveyClosedCallback: OnPaylisherSurveyClosed?
 
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
         switch call.method {
@@ -209,128 +194,11 @@ public class PaylisherFlutterPlugin: NSObject, FlutterPlugin {
             getSessionId(result: result)
         case "openUrl":
             openUrl(call, result: result)
-        case "surveyAction":
-            #if os(iOS)
-                handleSurveyAction(call, result: result)
-            #else
-                // surveys only supported on iOS
-                result(nil)
-            #endif
         default:
             result(FlutterMethodNotImplemented)
         }
     }
 }
-
-#if os(iOS)
-
-    // MARK: - PaylisherSurveysDelegate
-
-    extension PaylisherFlutterPlugin: PaylisherSurveysDelegate {
-        public func renderSurvey(
-            _ survey: PaylisherDisplaySurvey,
-            onSurveyShown: @escaping OnPaylisherSurveyShown,
-            onSurveyResponse: @escaping OnPaylisherSurveyResponse,
-            onSurveyClosed: @escaping OnPaylisherSurveyClosed
-        ) {
-            // Store the callbacks and survey for later use
-            currentSurvey = survey
-            onSurveyShownCallback = onSurveyShown
-            onSurveyResponseCallback = onSurveyResponse
-            onSurveyClosedCallback = onSurveyClosed
-
-            // We don't need to handle the result here
-            // All responses will come through the surveyResponse method
-            invokeFlutterMethod("showSurvey", arguments: survey.toDict())
-        }
-
-        public func cleanupSurveys() {
-            // Reset all survey-related state when the survey feature is stopped
-            currentSurvey = nil
-            onSurveyShownCallback = nil
-            onSurveyResponseCallback = nil
-            onSurveyClosedCallback = nil
-
-            // Notify Flutter side that surveys have been cleaned up
-            invokeFlutterMethod("hideSurveys", arguments: nil)
-        }
-
-        private func handleSurveyAction(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
-            guard let survey = currentSurvey,
-                  let args = call.arguments as? [String: Any],
-                  let type = args["type"] as? String
-            else {
-                result(FlutterError(code: "InvalidArguments", message: "Invalid survey action arguments", details: nil))
-                return
-            }
-
-            switch type {
-            case "shown":
-                onSurveyShownCallback?(survey)
-            case "response":
-                if let index = args["index"] as? Int,
-                   index < survey.questions.count
-                {
-                    let question = survey.questions[index]
-                    let responsePayload = args["response"]
-
-                    // Create PaylisherSurveyResponse based on question type
-                    var surveyResponse: PaylisherSurveyResponse
-
-                    switch question {
-                    case is PaylisherDisplayLinkQuestion:
-                        // For link questions
-                        let boolValue = responsePayload as? Bool ?? false
-                        surveyResponse = .link(boolValue)
-
-                    case is PaylisherDisplayRatingQuestion:
-                        // For rating questions
-                        let ratingValue = responsePayload as? Int
-                        surveyResponse = .rating(ratingValue)
-
-                    case let choiceQuestion as PaylisherDisplayChoiceQuestion:
-                        // For single/multiple choice questions
-                        var selectedOptions: [String]? = nil
-
-                        if choiceQuestion.isMultipleChoice {
-                            // Multiple choice: accept array directly from Flutter
-                            selectedOptions = responsePayload as? [String]
-                            surveyResponse = .multipleChoice(selectedOptions)
-                        } else {
-                            // Single choice: Flutter sends as a list with one element
-                            selectedOptions = responsePayload as? [String]
-                            surveyResponse = .singleChoice(selectedOptions?.first)
-                        }
-
-                    default:
-                        // Default to open text question
-                        let textValue = responsePayload as? String
-                        surveyResponse = .openEnded(textValue)
-                    }
-
-                    // Call the callback with the constructed response
-                    if let nextQuestion = onSurveyResponseCallback?(survey, index, surveyResponse) {
-                        result(["nextIndex": nextQuestion.questionIndex,
-                                "isSurveyCompleted": nextQuestion.isSurveyCompleted])
-                        return
-                    }
-                }
-            case "closed":
-                onSurveyClosedCallback?(survey)
-                // Clear the callbacks after survey is closed
-                currentSurvey = nil
-                onSurveyShownCallback = nil
-                onSurveyResponseCallback = nil
-                onSurveyClosedCallback = nil
-            default:
-                break
-            }
-
-            result(nil)
-        }
-    }
-
-#endif
 
 extension PaylisherFlutterPlugin {
     private func sendMetaEvent(_ call: FlutterMethodCall,
@@ -356,7 +224,7 @@ extension PaylisherFlutterPlugin {
                     let snapshotData: [String: Any] = ["type": 4, "data": data, "timestamp": timestamp]
                     snapshotsData.append(snapshotData)
 
-                    PaylisherSDK.shared.capture("$snapshot", properties: ["$snapshot_source": "mobile", "$snapshot_data": snapshotsData], timestamp: date)
+                    PaylisherSDK.shared.capture("$snapshot", properties: ["$snapshot_source": "mobile", "$snapshot_data": snapshotsData])
                 }
 
                 result(nil)
@@ -386,14 +254,10 @@ extension PaylisherFlutterPlugin {
 
                 dispatchQueue.async {
                     guard let image = UIImage(data: imageBytes.data) else {
-                        // bad data but we cannot do this in the calling thread
-                        // otherwise we are doing slow operatios in the main thread
                         return
                     }
 
                     guard let base64 = imageToBase64(image) else {
-                        // bad data but we cannot do this in the calling thread
-                        // otherwise we are doing slow operatios in the main thread
                         return
                     }
 
@@ -417,7 +281,7 @@ extension PaylisherFlutterPlugin {
                     let snapshotData: [String: Any] = ["type": 2, "data": data, "timestamp": timestamp]
                     snapshotsData.append(snapshotData)
 
-                    PaylisherSDK.shared.capture("$snapshot", properties: ["$snapshot_source": "mobile", "$snapshot_data": snapshotsData], timestamp: date)
+                    PaylisherSDK.shared.capture("$snapshot", properties: ["$snapshot_source": "mobile", "$snapshot_data": snapshotsData])
                 }
 
                 result(nil)
@@ -687,14 +551,7 @@ extension PaylisherFlutterPlugin {
 
         let properties = arguments["properties"] as? [String: Any]
 
-        // Extract timestamp from Flutter and convert to Date
-        var timestamp: Date? = nil
-        if let timestampMs = arguments["timestamp"] as? Int64 {
-            timestamp = Date(timeIntervalSince1970: TimeInterval(timestampMs) / 1000.0)
-        }
-
-        // Use capture method with timestamp to ensure Flutter timestamp is used
-        PaylisherSDK.shared.capture("$exception", properties: properties, timestamp: timestamp)
+        PaylisherSDK.shared.capture("$exception", properties: properties)
         result(nil)
     }
 
@@ -719,4 +576,14 @@ extension PaylisherFlutterPlugin {
             self?.channel?.invokeMethod(method, arguments: arguments)
         }
     }
+}
+
+// MARK: - Helper Functions
+
+func dateToMillis(_ date: Date) -> Int64 {
+    return Int64(date.timeIntervalSince1970 * 1000)
+}
+
+func imageToBase64(_ image: UIImage) -> String? {
+    return image.jpegData(compressionQuality: 0.8)?.base64EncodedString()
 }
