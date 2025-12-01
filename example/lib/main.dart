@@ -8,7 +8,7 @@ Future<void> main() async {
 
   WidgetsFlutterBinding.ensureInitialized();
   final config =
-      PaylisherConfig('phc_4X0rTcSz4dQ6NmXXFWrlMdoDdxge382aPVj0ozvSKCd');
+      PaylisherConfig('phc_IdFLs1M2ejaFF8wyx1AHCHAa1z2ybvjj5DbtDz3dzZu');
   config.debug = true;
   config.captureApplicationLifecycleEvents = false;
   config.host = 'https://ds.paylisher.com';

@@ -1,5 +1,9 @@
 ## Next
 
+## 5.9.2
+- Update iOS SDK dependency to 1.5.4 for Xcode 16 compatibility
+- Update Firebase dependencies to v11.0
+
 ## 5.9.0
 
 - feat: add autocapture exceptions ([#214](https://github.com/softmarketsolution/paylisher-FlutterSDK/pull/214))

@@ -1,6 +1,6 @@
 name: paylisher_flutter
 description: Flutter implementation of Paylisher client for iOS, Android and Web
-version: 5.9.1
+version: 5.9.2
 homepage: https://www.paylisher.com
 repository: https://github.com/softmarketsolution/paylisher-FlutterSDK //Bu alanları paylisher olarak değişeceğiz.
 issue_tracker: https://github.com/softmarketsolution/paylisher-FlutterSDK/issues

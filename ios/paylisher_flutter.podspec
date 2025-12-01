@@ -26,7 +26,7 @@ A Flutter plugin that provides bindings for the Paylisher iOS SDK.
   s.osx.dependency 'FlutterMacOS'
   
   # Paylisher iOS SDK
-  s.ios.dependency 'Paylisher', '~> 1.5.3'
+  s.ios.dependency 'Paylisher', '~> 1.5.4'
 
   s.ios.deployment_target = '13.0'
   s.osx.deployment_target = '10.15'
