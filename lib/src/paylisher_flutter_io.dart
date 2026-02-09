@@ -12,10 +12,13 @@ import 'surveys/models/survey_callbacks.dart';
 import 'error_tracking/dart_exception_processor.dart';
 import 'utils/property_normalizer.dart';
 
-import 'paylisher_config.dart';
-import 'paylisher_flutter_platform_interface.dart';
+import 'package:paylisher_flutter/src/paylisher_deeplink.dart';
+import 'package:paylisher_flutter/src/paylisher_notification.dart';
 
-/// An implementation of [PaylisherFlutterPlatformInterface] that uses method channels.
+import '../paylisher_flutter_platform_interface.dart';
+import 'paylisher_config.dart';
+
+/// An implementation of [PaylisherFlutterPlatformIO] that uses method channels.
 class PaylisherFlutterIO extends PaylisherFlutterPlatformInterface {
   PaylisherFlutterIO() {
     _methodChannel.setMethodCallHandler(_handleMethodCall);
@@ -23,6 +26,7 @@ class PaylisherFlutterIO extends PaylisherFlutterPlatformInterface {
 
   /// The method channel used to interact with the native platform.
   final _methodChannel = const MethodChannel('paylisher_flutter');
+  final _eventChannel = const EventChannel('paylisher_flutter_events');
 
   /// Stored configuration for accessing inAppIncludes and other settings
   PaylisherConfig? _config;
@@ -494,13 +498,12 @@ class PaylisherFlutterIO extends PaylisherFlutterPlatformInterface {
       final sessionId = await _methodChannel.invokeMethod('getSessionId');
       return sessionId;
     } on PlatformException catch (exception) {
-      printIfDebug('Exception on getSessionId: $exception');
       return null;
     }
   }
 
-  // For internal use
   @override
+  // For internal use
   Future<void> openUrl(String url) async {
     if (!isSupportedPlatform()) {
       printIfDebug('Cannot open url $url: Platform is not supported');
@@ -512,5 +515,42 @@ class PaylisherFlutterIO extends PaylisherFlutterPlatformInterface {
     } on PlatformException catch (exception) {
       printIfDebug('Exception on openUrl: $exception');
     }
+  }
+
+  @override
+  Future<void> requestNotificationPermission() async {
+    if (!isSupportedPlatform()) {
+      return;
+    }
+
+    try {
+      await _methodChannel.invokeMethod('requestNotificationPermission');
+    } on PlatformException catch (exception) {
+      printIfDebug('Exception on requestNotificationPermission: $exception');
+    }
+  }
+
+  Stream<PaylisherNotification>? _onNotificationReceived;
+
+  @override
+  Stream<PaylisherNotification> get onNotificationReceived {
+    _onNotificationReceived ??= _eventChannel
+        .receiveBroadcastStream()
+        .where((event) => (event as Map)['event'] == 'notificationReceived')
+        .map((event) => PaylisherNotification.fromMap(
+            Map<String, dynamic>.from((event as Map)['data'])));
+    return _onNotificationReceived!;
+  }
+
+  Stream<PaylisherDeeplink>? _onDeepLinkReceived;
+
+  @override
+  Stream<PaylisherDeeplink> get onDeepLinkReceived {
+    _onDeepLinkReceived ??= _eventChannel
+        .receiveBroadcastStream()
+        .where((event) => (event as Map)['event'] == 'deepLinkReceived')
+        .map((event) => PaylisherDeeplink.fromMap(
+            Map<String, dynamic>.from((event as Map)['data'])));
+    return _onDeepLinkReceived!;
   }
 }

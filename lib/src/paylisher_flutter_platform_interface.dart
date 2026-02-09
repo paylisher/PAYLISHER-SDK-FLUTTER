@@ -1,7 +1,9 @@
 import 'package:plugin_platform_interface/plugin_platform_interface.dart';
 
 import 'paylisher_config.dart';
+import 'paylisher_deeplink.dart';
 import 'paylisher_flutter_io.dart';
+import 'paylisher_notification.dart';
 
 abstract class PaylisherFlutterPlatformInterface extends PlatformInterface {
   /// Constructs a PaylisherFlutterPlatform.
@@ -145,4 +147,16 @@ abstract class PaylisherFlutterPlatformInterface extends PlatformInterface {
   }
 
   // TODO: missing capture with more parameters
+ 
+  Future<void> requestNotificationPermission() {
+    throw UnimplementedError('requestNotificationPermission() has not been implemented.');
+  }
+
+  Stream<PaylisherNotification> get onNotificationReceived {
+    throw UnimplementedError('onNotificationReceived has not been implemented.');
+  }
+
+  Stream<PaylisherDeeplink> get onDeepLinkReceived {
+    throw UnimplementedError('onDeepLinkReceived has not been implemented.');
+  }
 }

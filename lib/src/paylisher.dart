@@ -2,7 +2,9 @@ import 'package:meta/meta.dart';
 
 import 'package:paylisher_flutter/src/error_tracking/paylisher_error_tracking_autocapture_integration.dart';
 import 'paylisher_config.dart';
+import 'paylisher_deeplink.dart';
 import 'paylisher_flutter_platform_interface.dart';
+import 'paylisher_notification.dart';
 import 'paylisher_observer.dart';
 
 class Paylisher {
@@ -173,6 +175,18 @@ class Paylisher {
   }
 
   Future<String?> getSessionId() => _paylisher.getSessionId();
+
+  Future<String?> getSessionId() => _paylisher.getSessionId();
+
+  /// Notification & Deeplink
+  Future<void> requestNotificationPermission() =>
+      _paylisher.requestNotificationPermission();
+
+  Stream<PaylisherNotification> get onNotificationReceived =>
+      _paylisher.onNotificationReceived;
+
+  Stream<PaylisherDeeplink> get onDeepLinkReceived =>
+      _paylisher.onDeepLinkReceived;
 
   Paylisher._internal();
 }

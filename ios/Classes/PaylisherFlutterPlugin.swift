@@ -17,6 +17,8 @@ public class PaylisherFlutterPlugin: NSObject, FlutterPlugin {
     public static func register(with registrar: FlutterPluginRegistrar) {
         #if os(iOS)
             let channel = FlutterMethodChannel(name: "paylisher_flutter", binaryMessenger: registrar.messenger())
+            let eventChannel = FlutterEventChannel(name: "paylisher_flutter_events", binaryMessenger: registrar.messenger())
+            eventChannel.setStreamHandler(PaylisherFlutterNotificationManager.shared)
         #elseif os(macOS)
             let channel = FlutterMethodChannel(name: "paylisher_flutter", binaryMessenger: registrar.messenger)
         #endif
@@ -25,6 +27,7 @@ public class PaylisherFlutterPlugin: NSObject, FlutterPlugin {
         PaylisherFlutterPlugin.instance = instance
         initPlugin()
         registrar.addMethodCallDelegate(instance, channel: channel)
+        registrar.addApplicationDelegate(instance)
     }
 
     private let dispatchQueue = DispatchQueue(label: "com.paylisher.PaylisherFlutterPlugin",
@@ -138,6 +141,12 @@ public class PaylisherFlutterPlugin: NSObject, FlutterPlugin {
         paylisherVersion = paylisherFlutterVersion
 
         PaylisherSDK.shared.setup(config)
+        
+        #if os(iOS)
+        if let instance = PaylisherFlutterPlugin.instance {
+            PaylisherSDK.shared.setDeepLinkHandler(instance)
+        }
+        #endif
     }
 
     public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
@@ -194,6 +203,8 @@ public class PaylisherFlutterPlugin: NSObject, FlutterPlugin {
             getSessionId(result: result)
         case "openUrl":
             openUrl(call, result: result)
+        case "requestNotificationPermission":
+            requestNotificationPermission(result)
         default:
             result(FlutterMethodNotImplemented)
         }
@@ -575,6 +586,63 @@ extension PaylisherFlutterPlugin {
         DispatchQueue.main.async { [weak self] in
             self?.channel?.invokeMethod(method, arguments: arguments)
         }
+    }
+
+    private func requestNotificationPermission(_ result: @escaping FlutterResult) {
+        #if os(iOS)
+        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, error in
+            DispatchQueue.main.async {
+                if let error = error {
+                    result(FlutterError(code: "PERMISSION_ERROR", message: error.localizedDescription, details: nil))
+                } else {
+                    result(nil) // success implies request completed, granted status not returned in existing interface? 
+                    // Wait, existing interface Future<void> requestNotificationPermission().
+                    // So returning nil is correct for success/completion.
+                }
+            }
+        }
+        #else
+        result(nil)
+        #endif
+    }
+}
+
+}
+
+// MARK: - PaylisherDeepLinkHandler & Application Life Cycle
+
+extension PaylisherFlutterPlugin: PaylisherDeepLinkHandler {
+    
+    public func application(_ application: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey : Any] = [:]) -> Bool {
+        return PaylisherSDK.shared.handleDeepLink(url)
+    }
+    
+    public func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([Any]) -> Void) -> Bool {
+        return PaylisherSDK.shared.handleUserActivity(userActivity)
+    }
+    
+    public func paylisherDidReceiveDeepLink(_ deepLink: PaylisherDeepLink, requiresAuth: Bool) {
+        let event: [String: Any] = [
+            "event": "deepLinkReceived",
+            "data": [
+                "url": deepLink.url.absoluteString,
+                "scheme": deepLink.scheme ?? "",
+                "destination": deepLink.destination,
+                "parameters": deepLink.parameters ?? [:],
+                "campaignId": deepLink.campaignId ?? ""
+            ]
+        ]
+        
+        PaylisherFlutterNotificationManager.shared.sendEvent(event)
+    }
+    
+    public func paylisherDeepLinkRequiresAuth(_ deepLink: PaylisherDeepLink, completion: @escaping (Bool) -> Void) {
+        // Auto-complete for now as no Dart callback mechanism is defined for auth flow
+        completion(true)
+    }
+    
+    public func paylisherDeepLinkDidFail(_ url: URL, error: Error?) {
+        print("[PaylisherFlutter] Deep link failed: \(url), error: \(String(describing: error))")
     }
 }
 

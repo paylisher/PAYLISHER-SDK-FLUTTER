@@ -11,7 +11,15 @@ import com.paylisher.PersonProfiles
 import com.paylisher.android.PaylisherAndroid
 import com.paylisher.android.PaylisherAndroidConfig
 import com.paylisher.android.internal.getApplicationInfo
+import com.paylisher.android.notification.NotificationHelper
 import io.flutter.embedding.engine.plugins.FlutterPlugin
+import io.flutter.embedding.engine.plugins.activity.ActivityAware
+import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
+import com.paylisher.PaylisherDeepLink
+import com.paylisher.android.PaylisherDeepLinkHandler
+import com.paylisher.android.PaylisherDeepLinkManager
+import io.flutter.plugin.common.PluginRegistry
+import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
 import io.flutter.plugin.common.MethodChannel.MethodCallHandler
@@ -20,16 +28,23 @@ import java.util.Date
 
 class PaylisherFlutterPlugin :
     FlutterPlugin,
-    MethodCallHandler {
+    MethodCallHandler,
+    ActivityAware,
+    PluginRegistry.NewIntentListener,
+    PaylisherDeepLinkHandler {
 
     private lateinit var channel: MethodChannel
-    private lateinit var applicationContext: Context
+    private lateinit var eventChannel: EventChannel
+    private lateinit var context: Context
+    private var activity: Activity? = null
 
     private val snapshotSender = SnapshotSender()
 
     override fun onAttachedToEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(binding.binaryMessenger, "paylisher_flutter")
-        applicationContext = binding.applicationContext
+        eventChannel = EventChannel(binding.binaryMessenger, "paylisher_flutter_events")
+        eventChannel.setStreamHandler(PaylisherFlutterNotificationManager.getInstance(context))
+        context = binding.applicationContext
         Log.d("Paylisher", "[FlutterPlugin] onAttachedToEngine() çağırıldı")
 
         initPlugin()
@@ -108,6 +123,7 @@ class PaylisherFlutterPlugin :
             "isSessionReplayActive" -> result.success(Paylisher.isSessionReplayActive())
             "getSessionId" -> getSessionId(result)
             "openUrl" -> openUrl(call, result)
+            "requestNotificationPermission" -> requestNotificationPermission(result)
 
             "surveyAction" -> {
                 Log.w("Paylisher", "[Survey] Android SDK survey desteklemiyor → yok sayılıyor")
@@ -454,6 +470,44 @@ class PaylisherFlutterPlugin :
         }
     }
 
+    private fun requestNotificationPermission(result: Result) {
+        try {
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
+                val activity = this.activity
+                if (activity == null) {
+                    result.error("NO_ACTIVITY", "Activity is not available to request permissions", null)
+                    return
+                }
+                
+                // Check if permission is already granted
+                if (androidx.core.content.ContextCompat.checkSelfPermission(
+                        context,
+                        android.Manifest.permission.POST_NOTIFICATIONS
+                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                ) {
+                   result.success(true)
+                   return
+                }
+
+                // Request permission
+                androidx.core.app.ActivityCompat.requestPermissions(
+                    activity,
+                    arrayOf(android.Manifest.permission.POST_NOTIFICATIONS),
+                    101 // Request code
+                )
+                // We are not waiting for callback here for simplicity as Flutter side usually just triggers it. 
+                // To properly return result, we'd need RequestPermissionsResultListener. 
+                // For now, returning null/success to indicate request initiated.
+                result.success(null)
+            } else {
+                // Permission not needed for older Android versions
+                result.success(true)
+            }
+        } catch (e: Throwable) {
+            result.error("PERMISSION_ERROR", e.message, null)
+        }
+    }
+
     @Suppress("UNCHECKED_CAST")
     private fun <T> Map<String, Any>.getIfNotNull(
         key: String,
@@ -465,5 +519,58 @@ class PaylisherFlutterPlugin :
     override fun onDetachedFromEngine(binding: FlutterPlugin.FlutterPluginBinding) {
         Log.d("Paylisher", "[FlutterPlugin] Detached")
         channel.setMethodCallHandler(null)
+    }
+
+    override fun onAttachedToActivity(binding: ActivityPluginBinding) {
+        activity = binding.activity
+        binding.addOnNewIntentListener(this)
+        PaylisherDeepLinkManager.getInstance().setHandler(this)
+        
+        // Handle initial intent if app was launched via deep link
+        binding.activity.intent?.let {
+             PaylisherDeepLinkManager.getInstance().handleIntent(it)
+        }
+    }
+
+    override fun onDetachedFromActivityForConfigChanges() {
+        activity = null
+    }
+
+    override fun onReattachedToActivityForConfigChanges(binding: ActivityPluginBinding) {
+        activity = binding.activity
+        binding.addOnNewIntentListener(this)
+        PaylisherDeepLinkManager.getInstance().setHandler(this)
+    }
+
+    override fun onNewIntent(intent: Intent): Boolean {
+        PaylisherDeepLinkManager.getInstance().handleIntent(intent)
+        return true
+    }
+
+    override fun paylisherDidReceiveDeepLink(deepLink: PaylisherDeepLink, requiresAuth: Boolean) {
+        val eventMap = mapOf(
+            "event" to "deepLinkReceived",
+            "data" to mapOf(
+                "url" to deepLink.url,
+                "scheme" to deepLink.scheme,
+                "destination" to deepLink.destination,
+                "parameters" to deepLink.parameters,
+                "campaignId" to deepLink.campaignId
+            )
+        )
+        
+        PaylisherFlutterNotificationManager.getInstance(context).sendEvent(eventMap)
+    }
+
+    override fun paylisherDeepLinkRequiresAuth(deepLink: PaylisherDeepLink, completion: (Boolean) -> Unit) {
+        completion(true) 
+    }
+
+    override fun paylisherDeepLinkDidFail(url: String, error: Exception?) {
+        Log.e("Paylisher", "Deep link failed: $url", error)
+    }
+
+    override fun onDetachedFromActivity() {
+        activity = null
     }
 }
