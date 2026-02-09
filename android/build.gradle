@@ -16,6 +16,7 @@ buildscript {
 
 allprojects {
     repositories {
+        mavenLocal()
         google()
         mavenCentral()
     }
@@ -69,7 +70,7 @@ android {
 dependencies {
     testImplementation 'org.jetbrains.kotlin:kotlin-test'
     testImplementation 'org.mockito:mockito-core:5.0.0'
-    implementation 'com.paylisher:paylisher-sdk:1.0.7'
-    implementation 'com.paylisher:paylisher-sdk-android:1.0.7'
+    api 'com.paylisher:paylisher-sdk-lite:1.0.4'
+    api 'com.paylisher:paylisher-sdk-android-lite:1.0.4'
     implementation 'com.google.code.gson:gson:2.10.1'
 }

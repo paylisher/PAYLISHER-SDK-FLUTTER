@@ -1,5 +1,7 @@
 import 'dart:async';
 
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/material.dart';
 import 'package:paylisher_flutter/paylisher_flutter.dart';
 
@@ -7,6 +9,8 @@ Future<void> main() async {
   // // init WidgetsFlutterBinding if not yet
 
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp();
+
   final config =
       PaylisherConfig('phc_IdFLs1M2ejaFF8wyx1AHCHAa1z2ybvjj5DbtDz3dzZu');
   config.debug = true;
@@ -67,10 +71,110 @@ class InitialScreen extends StatefulWidget {
 class InitialScreenState extends State<InitialScreen> {
   final _paylisherFlutterPlugin = Paylisher();
   dynamic _result = "";
+  
+  // New state variables
+  Map<dynamic, dynamic>? _latestNotification;
+  PaylisherDeeplink? _latestDeepLink;
+  StreamSubscription? _notificationSubscription;
+  StreamSubscription? _deepLinkSubscription;
 
   @override
   void initState() {
     super.initState();
+    _setupListeners();
+    _setupFirebaseMessaging();
+  }
+  
+  void _setupListeners() {
+    // Listen for notifications
+    _notificationSubscription = _paylisherFlutterPlugin.onNotificationReceived.listen((notification) {
+      print("Notification received in example app: ${notification.payload}");
+      setState(() {
+        _latestNotification = notification.payload;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text("Notification Received!")),
+        );
+      }
+    });
+
+    // Listen for deep links
+    _deepLinkSubscription = _paylisherFlutterPlugin.onDeepLinkReceived.listen((deepLink) {
+      print("Deep Link received in example app: ${deepLink.url}");
+      setState(() {
+        _latestDeepLink = deepLink;
+      });
+      
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text("Deep Link: ${deepLink.destination}")),
+        );
+      }
+    });
+  }
+
+  Future<void> _setupFirebaseMessaging() async {
+    try {
+      FirebaseMessaging messaging = FirebaseMessaging.instance;
+
+      NotificationSettings settings = await messaging.requestPermission(
+        alert: true,
+        announcement: false,
+        badge: true,
+        carPlay: false,
+        criticalAlert: false,
+        provisional: false,
+        sound: true,
+      );
+
+      print('User granted permission: ${settings.authorizationStatus}');
+
+      // Get the token each time the application loads
+      String? token = await messaging.getToken();
+      if (token != null) {
+        print("FCM Token: $token");
+        // Register the token with Paylisher
+        // Depending on Paylisher SDK, we might need a specific method or just identify/register
+        // Here we use register as a generic way to pass the token if no specific method exists in Dart interface
+        // But checking PaylisherAndroid.kt, it captures "FCM" event with "token" property. 
+        // We can replicate this behavior or rely on SDK auto-capture.
+        // For example app, let's explicitly capture it to be sure.
+        _paylisherFlutterPlugin.capture(eventName: "FCM", properties: {"token": token});
+        // Also register it as a user property
+        _paylisherFlutterPlugin.identify(userId: await _paylisherFlutterPlugin.getDistinctId(), userProperties: {"fcm_token": token});
+      }
+
+      // Any time the token refreshes, store this in the database too.
+      FirebaseMessaging.instance.onTokenRefresh.listen((fcmToken) {
+        print("FCM Token Refreshed: $fcmToken");
+        _paylisherFlutterPlugin.capture(eventName: "FCM", properties: {"token": fcmToken});
+         _paylisherFlutterPlugin.identify(userId: "myId", userProperties: {"fcm_token": fcmToken}); // Re-identify or update props if possible
+         // Note: optimize userId retrieval in real app
+      }).onError((err) {
+        print("Error getting token refresh");
+      });
+      
+      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+        print('Got a message whilst in the foreground!');
+        print('Message data: ${message.data}');
+
+        if (message.notification != null) {
+          print('Message also contained a notification: ${message.notification}');
+        }
+      });
+
+    } catch (e) {
+      print("Error setting up Firebase Messaging: $e");
+    }
+  }
+
+  @override
+  void dispose() {
+    _notificationSubscription?.cancel();
+    _deepLinkSubscription?.cancel();
+    super.dispose();
   }
 
   @override
@@ -85,6 +189,60 @@ class InitialScreenState extends State<InitialScreen> {
           child: Center(
             child: Column(
               children: [
+                const Padding(
+                  padding: EdgeInsets.all(8.0),
+                  child: Text(
+                    "Notifications & Deep Links",
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                ),
+                ElevatedButton(
+                  onPressed: () async {
+                    await _paylisherFlutterPlugin.requestNotificationPermission();
+                    if (mounted) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text("Permission requested")),
+                      );
+                    }
+                  },
+                  child: const Text("Request Notification Permission"),
+                ),
+                if (_latestNotification != null)
+                  Card(
+                    color: Colors.orange.shade100,
+                    margin: const EdgeInsets.symmetric(vertical: 8),
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text("Latest Notification:", style: TextStyle(fontWeight: FontWeight.bold)),
+                          Text(_latestNotification.toString()),
+                        ],
+                      ),
+                    ),
+                  ),
+                if (_latestDeepLink != null)
+                  Card(
+                    color: Colors.blue.shade100,
+                    margin: const EdgeInsets.symmetric(vertical: 8),
+                    child: Padding(
+                      padding: const EdgeInsets.all(8.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text("Latest Deep Link:", style: TextStyle(fontWeight: FontWeight.bold)),
+                          Text("URL: ${_latestDeepLink!.url}"),
+                          Text("Destination: ${_latestDeepLink!.destination}"),
+                          if (_latestDeepLink!.campaignId != null)
+                            Text("Campaign: ${_latestDeepLink!.campaignId}"),
+                          if (_latestDeepLink!.parameters?.isNotEmpty ?? false)
+                             Text("Params: ${_latestDeepLink!.parameters}"),
+                        ],
+                      ),
+                    ),
+                  ),
+                const Divider(),
                 ElevatedButton(
                   onPressed: () {
                     Navigator.push(
@@ -283,7 +441,7 @@ class InitialScreenState extends State<InitialScreen> {
                           'exception_category': 'custom',
                         },
                       );
-
+ 
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
@@ -334,7 +492,7 @@ class InitialScreenState extends State<InitialScreen> {
                         ),
                       );
                     }
-
+ 
                     // Test Flutter error handler by throwing in widget context
                     throw const CustomException(
                         'Test Flutter error for autocapture',
@@ -358,7 +516,7 @@ class InitialScreenState extends State<InitialScreen> {
                             'test_type': 'platform_dispatcher_error'
                           });
                     });
-
+ 
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
@@ -388,7 +546,7 @@ class InitialScreenState extends State<InitialScreen> {
                         },
                       );
                     });
-
+ 
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(

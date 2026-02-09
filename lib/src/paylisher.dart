@@ -176,7 +176,7 @@ class Paylisher {
 
   Future<String?> getSessionId() => _paylisher.getSessionId();
 
-  Future<String?> getSessionId() => _paylisher.getSessionId();
+
 
   /// Notification & Deeplink
   Future<void> requestNotificationPermission() =>

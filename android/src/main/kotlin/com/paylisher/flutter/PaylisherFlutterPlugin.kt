@@ -15,10 +15,11 @@ import com.paylisher.android.notification.NotificationHelper
 import io.flutter.embedding.engine.plugins.FlutterPlugin
 import io.flutter.embedding.engine.plugins.activity.ActivityAware
 import io.flutter.embedding.engine.plugins.activity.ActivityPluginBinding
-import com.paylisher.PaylisherDeepLink
+import com.paylisher.android.PaylisherDeepLink
 import com.paylisher.android.PaylisherDeepLinkHandler
 import com.paylisher.android.PaylisherDeepLinkManager
 import io.flutter.plugin.common.PluginRegistry
+import android.app.Activity
 import io.flutter.plugin.common.EventChannel
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -54,7 +55,7 @@ class PaylisherFlutterPlugin :
 
     private fun initPlugin() {
         try {
-            val ai = getApplicationInfo(applicationContext)
+            val ai = getApplicationInfo(context)
             val bundle = ai.metaData ?: Bundle()
             val autoInit = bundle.getBoolean("com.paylisher.paylisher.AUTO_INIT", true)
 
@@ -195,7 +196,7 @@ class PaylisherFlutterPlugin :
         }
 
         Log.d("Paylisher", "[setupPaylisher] PaylisherAndroid.setup() çağırılıyor")
-        PaylisherAndroid.setup(applicationContext, config)
+        PaylisherAndroid.setup(context, config)
     }
 
     private fun handleMetaEvent(call: MethodCall, result: Result) {
@@ -462,7 +463,7 @@ class PaylisherFlutterPlugin :
                 addCategory(Intent.CATEGORY_BROWSABLE)
             }
 
-            applicationContext.startActivity(intent)
+            context.startActivity(intent)
             result.success(null)
 
         } catch (e: ActivityNotFoundException) {

@@ -15,7 +15,7 @@ import 'utils/property_normalizer.dart';
 import 'package:paylisher_flutter/src/paylisher_deeplink.dart';
 import 'package:paylisher_flutter/src/paylisher_notification.dart';
 
-import '../paylisher_flutter_platform_interface.dart';
+import 'paylisher_flutter_platform_interface.dart';
 import 'paylisher_config.dart';
 
 /// An implementation of [PaylisherFlutterPlatformIO] that uses method channels.
