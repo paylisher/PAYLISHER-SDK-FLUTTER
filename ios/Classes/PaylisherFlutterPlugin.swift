@@ -607,8 +607,6 @@ extension PaylisherFlutterPlugin {
     }
 }
 
-}
-
 // MARK: - PaylisherDeepLinkHandler & Application Life Cycle
 
 extension PaylisherFlutterPlugin: PaylisherDeepLinkHandler {

@@ -12,10 +12,10 @@ Future<void> main() async {
   await Firebase.initializeApp();
 
   final config =
-      PaylisherConfig('phc_IdFLs1M2ejaFF8wyx1AHCHAa1z2ybvjj5DbtDz3dzZu');
+      PaylisherConfig('phc_3wZe1GW8GRdeUGQK0LqaS25PEDUNS9EBSxe7FiQFqQW');
   config.debug = true;
   config.captureApplicationLifecycleEvents = false;
-  config.host = 'https://ds.paylisher.com';
+  config.host = 'https://ds-tr.paylisher.com';
   config.surveys = true;
   config.sessionReplay = true;
   config.sessionReplayConfig.maskAllTexts = false;
@@ -71,7 +71,7 @@ class InitialScreen extends StatefulWidget {
 class InitialScreenState extends State<InitialScreen> {
   final _paylisherFlutterPlugin = Paylisher();
   dynamic _result = "";
-  
+
   // New state variables
   Map<dynamic, dynamic>? _latestNotification;
   PaylisherDeeplink? _latestDeepLink;
@@ -84,15 +84,16 @@ class InitialScreenState extends State<InitialScreen> {
     _setupListeners();
     _setupFirebaseMessaging();
   }
-  
+
   void _setupListeners() {
     // Listen for notifications
-    _notificationSubscription = _paylisherFlutterPlugin.onNotificationReceived.listen((notification) {
+    _notificationSubscription =
+        _paylisherFlutterPlugin.onNotificationReceived.listen((notification) {
       print("Notification received in example app: ${notification.payload}");
       setState(() {
         _latestNotification = notification.payload;
       });
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text("Notification Received!")),
@@ -101,12 +102,13 @@ class InitialScreenState extends State<InitialScreen> {
     });
 
     // Listen for deep links
-    _deepLinkSubscription = _paylisherFlutterPlugin.onDeepLinkReceived.listen((deepLink) {
+    _deepLinkSubscription =
+        _paylisherFlutterPlugin.onDeepLinkReceived.listen((deepLink) {
       print("Deep Link received in example app: ${deepLink.url}");
       setState(() {
         _latestDeepLink = deepLink;
       });
-      
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text("Deep Link: ${deepLink.destination}")),
@@ -138,33 +140,39 @@ class InitialScreenState extends State<InitialScreen> {
         // Register the token with Paylisher
         // Depending on Paylisher SDK, we might need a specific method or just identify/register
         // Here we use register as a generic way to pass the token if no specific method exists in Dart interface
-        // But checking PaylisherAndroid.kt, it captures "FCM" event with "token" property. 
+        // But checking PaylisherAndroid.kt, it captures "FCM" event with "token" property.
         // We can replicate this behavior or rely on SDK auto-capture.
         // For example app, let's explicitly capture it to be sure.
-        _paylisherFlutterPlugin.capture(eventName: "FCM", properties: {"token": token});
+        _paylisherFlutterPlugin
+            .capture(eventName: "FCM", properties: {"token": token});
         // Also register it as a user property
-        _paylisherFlutterPlugin.identify(userId: await _paylisherFlutterPlugin.getDistinctId(), userProperties: {"fcm_token": token});
+        _paylisherFlutterPlugin.identify(
+            userId: await _paylisherFlutterPlugin.getDistinctId(),
+            userProperties: {"fcm_token": token});
       }
 
       // Any time the token refreshes, store this in the database too.
       FirebaseMessaging.instance.onTokenRefresh.listen((fcmToken) {
         print("FCM Token Refreshed: $fcmToken");
-        _paylisherFlutterPlugin.capture(eventName: "FCM", properties: {"token": fcmToken});
-         _paylisherFlutterPlugin.identify(userId: "myId", userProperties: {"fcm_token": fcmToken}); // Re-identify or update props if possible
-         // Note: optimize userId retrieval in real app
+        _paylisherFlutterPlugin
+            .capture(eventName: "FCM", properties: {"token": fcmToken});
+        _paylisherFlutterPlugin.identify(userId: "myId", userProperties: {
+          "fcm_token": fcmToken
+        }); // Re-identify or update props if possible
+        // Note: optimize userId retrieval in real app
       }).onError((err) {
         print("Error getting token refresh");
       });
-      
+
       FirebaseMessaging.onMessage.listen((RemoteMessage message) {
         print('Got a message whilst in the foreground!');
         print('Message data: ${message.data}');
 
         if (message.notification != null) {
-          print('Message also contained a notification: ${message.notification}');
+          print(
+              'Message also contained a notification: ${message.notification}');
         }
       });
-
     } catch (e) {
       print("Error setting up Firebase Messaging: $e");
     }
@@ -198,7 +206,8 @@ class InitialScreenState extends State<InitialScreen> {
                 ),
                 ElevatedButton(
                   onPressed: () async {
-                    await _paylisherFlutterPlugin.requestNotificationPermission();
+                    await _paylisherFlutterPlugin
+                        .requestNotificationPermission();
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(content: Text("Permission requested")),
@@ -216,7 +225,8 @@ class InitialScreenState extends State<InitialScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text("Latest Notification:", style: TextStyle(fontWeight: FontWeight.bold)),
+                          const Text("Latest Notification:",
+                              style: TextStyle(fontWeight: FontWeight.bold)),
                           Text(_latestNotification.toString()),
                         ],
                       ),
@@ -231,13 +241,14 @@ class InitialScreenState extends State<InitialScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Text("Latest Deep Link:", style: TextStyle(fontWeight: FontWeight.bold)),
+                          const Text("Latest Deep Link:",
+                              style: TextStyle(fontWeight: FontWeight.bold)),
                           Text("URL: ${_latestDeepLink!.url}"),
                           Text("Destination: ${_latestDeepLink!.destination}"),
                           if (_latestDeepLink!.campaignId != null)
                             Text("Campaign: ${_latestDeepLink!.campaignId}"),
                           if (_latestDeepLink!.parameters?.isNotEmpty ?? false)
-                             Text("Params: ${_latestDeepLink!.parameters}"),
+                            Text("Params: ${_latestDeepLink!.parameters}"),
                         ],
                       ),
                     ),
@@ -441,7 +452,7 @@ class InitialScreenState extends State<InitialScreen> {
                           'exception_category': 'custom',
                         },
                       );
- 
+
                       if (mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
                           const SnackBar(
@@ -492,7 +503,7 @@ class InitialScreenState extends State<InitialScreen> {
                         ),
                       );
                     }
- 
+
                     // Test Flutter error handler by throwing in widget context
                     throw const CustomException(
                         'Test Flutter error for autocapture',
@@ -516,7 +527,7 @@ class InitialScreenState extends State<InitialScreen> {
                             'test_type': 'platform_dispatcher_error'
                           });
                     });
- 
+
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
@@ -546,7 +557,7 @@ class InitialScreenState extends State<InitialScreen> {
                         },
                       );
                     });
- 
+
                     if (mounted) {
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
